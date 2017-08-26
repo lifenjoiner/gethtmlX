@@ -238,7 +238,7 @@ void PrintGumboNode(const GumboNode* node) {
         break;
     case GUMBO_NODE_ELEMENT:
         DBG("original_tag.length: %d\n", node->v.element.original_tag.length);
-        if (node->v.element.end_pos.offset != node->v.element.start_pos.offset) { //???
+        if (node->v.element.end_pos.offset > node->v.element.start_pos.offset) { //???
             n = node->v.element.end_pos.offset
                 - node->v.element.start_pos.offset
                 + node->v.element.original_end_tag.length;
