@@ -6,10 +6,23 @@
 typedef struct{
     void** items;
     size_t length;
-} Array;
+    size_t capacity;
+} Vector;
 
-Array str_split(const char* str, const char* delims) {
-    Array Str;
+void Vector_init(Vector* vector) {
+    vector->items = NULL;
+    vector->length = 0;
+    vector->capacity = 0;
+}
+
+void Vector_free(Vector* vector) {
+    free(vector->items);
+    vector->length = 0;
+    vector->capacity = 0;
+}
+
+Vector str_split(const char* str, const char* delims) {
+    Vector Str;
     char *str_t, *p;
     void **pp;
     //
@@ -32,7 +45,7 @@ Array str_split(const char* str, const char* delims) {
     return Str;
 }
 
-int array_in_array(Array *arr_v, Array *arr_s) {
+int Vector_in_Vector(Vector *arr_v, Vector *arr_s) {
     size_t i, j;
     int flag_t, flag_i;
     flag_t = 0;

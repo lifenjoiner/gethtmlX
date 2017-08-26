@@ -7,7 +7,7 @@
 #include <assert.h>
 
 #include "debug.h"
-#include "array.h"
+#include "vector.h"
 #include "stringx.h"
 #include "file.h"
 
@@ -16,6 +16,21 @@
 char* document_str;
 GumboNode* document;
 
+void get_node_children(const GumboNode* node, GumboVector *children) {
+    switch (node->type) {
+    case GUMBO_NODE_DOCUMENT:
+        *children = node->v.document.children;
+        break;
+    case GUMBO_NODE_ELEMENT:
+        *children = node->v.element.children;
+        break;
+    default:
+        children->length = 0;
+        break;
+    }
+}
+
+/**/
 char* getAttribute(const GumboNode* node, const char* attri) {
     if (node->type == GUMBO_NODE_ELEMENT) {
         GumboAttribute* GA = gumbo_get_attribute(&node->v.element.attributes, attri);
@@ -68,17 +83,7 @@ GumboNode* getElementById(const GumboNode* node, const char* id) {
     GumboAttribute* ID;
     size_t length, i;
     //
-    switch (node->type) {
-    case GUMBO_NODE_DOCUMENT:
-        children = node->v.document.children;
-        break;
-    case GUMBO_NODE_ELEMENT:
-        children = node->v.element.children;
-        break;
-    default:
-        children.length = 0;
-        break;
-    }
+    get_node_children(node, &children);
     length = children.length;
     for (i = 0; i < length; i++) {
         GumboNode* child = children.data[i];
@@ -94,55 +99,32 @@ GumboNode* getElementById(const GumboNode* node, const char* id) {
     return targetNode;
 }
 
-typedef Array NodeCollection;
-
-/* MUST be initialled, or there will be random value! */
-static void node_collection_init(NodeCollection* nc) {
-    nc->items = NULL;
-    nc->length = 0;
-}
-
-static void node_collection_free(NodeCollection* nc) {
-    free(nc->items);
-    nc->length = 0;
-}
-
 /*  special case:
     1. original class name contains space char
     2. filter class name contains space char. IE11: Y, Chrome: N.
     3. getElementsByClassNames(), to locate exactly
 */
-NodeCollection getElementsByClassName(const GumboNode* node, const char* classname) {
+Vector getElementsByClassName(const GumboNode* node, const char* classname) {
     GumboVector children;
     GumboAttribute* CLASS;
-    NodeCollection node_collection;
-    NodeCollection sub_node_collection;
-    node_collection_init(&node_collection);
-    node_collection_init(&sub_node_collection);
+    Vector node_collection;
+    Vector sub_node_collection;
+    Vector_init(&node_collection);
+    Vector_init(&sub_node_collection);
     int pointer_length = sizeof(void *);
     size_t length, i;
     //
-    switch (node->type) {
-    case GUMBO_NODE_DOCUMENT:
-        children = node->v.document.children;
-        break;
-    case GUMBO_NODE_ELEMENT:
-        children = node->v.element.children;
-        break;
-    default:
-        children.length = 0;
-        break;
-    }
+    get_node_children(node, &children);
     length = children.length;
     for (i = 0; i < length; i++) {
         GumboNode* child = children.data[i];
         if ( child->type == GUMBO_NODE_ELEMENT ) {
             if ((CLASS = gumbo_get_attribute(&child->v.element.attributes, "class"))
             && *CLASS->value ) { /* speed up */
-                Array classname_s, classname_v;
+                Vector classname_s, classname_v;
                 classname_s = str_split(classname, " ");
                 classname_v = str_split(CLASS->value, " \x09\x0A\x0C\x0D");
-                if ( array_in_array(&classname_v, &classname_s) != 0 ) {
+                if ( Vector_in_Vector(&classname_v, &classname_s) != 0 ) {
                     void **pp = realloc(node_collection.items, (node_collection.length + 1) * pointer_length);
                     assert(pp != NULL);
                     node_collection.items = pp;
@@ -163,48 +145,46 @@ NodeCollection getElementsByClassName(const GumboNode* node, const char* classna
     return node_collection;
 }
 
-NodeCollection getElementsByTagName(const GumboNode* node, const char* tagname) {
+Vector getElementsByTagName(const GumboNode* node, const char* tagname) {
     GumboVector children;
-    NodeCollection node_collection;
-    NodeCollection sub_node_collection;
-    node_collection_init(&node_collection);
-    node_collection_init(&sub_node_collection);
+    Vector node_collection;
+    Vector sub_node_collection;
+    Vector_init(&node_collection);
+    Vector_init(&sub_node_collection);
     int pointer_length = sizeof(void *);
     size_t length, i;
     //
-    switch (node->type) {
-    case GUMBO_NODE_DOCUMENT:
-        children = node->v.document.children;
-        break;
-    case GUMBO_NODE_ELEMENT:
-        children = node->v.element.children;
-        break;
-    default:
-        children.length = 0;
-        break;
-    }
+    get_node_children(node, &children);
     length = children.length;
     for (i = 0; i < length; i++) {
         GumboNode* child = children.data[i];
         if ( child->type == GUMBO_NODE_ELEMENT ) {
+            char *p, *tag;
+            int n = 0;
+            /* html returns more
+            if (child->v.element.tag != GUMBO_TAG_UNKNOWN) {
+                p = (char*)gumbo_normalized_tagname(child->v.element.tag);
+                n = strlen(p);
+            }
+            else
+            */
             if (child->v.element.original_tag.length > 0) {
-                char *p, *p2;
-                int n;
-                p = (char*)child->v.element.original_tag.data;
-                p2 = strpbrk(p, " \x09\x0A\x0C\x0D/>");
-                n = p2 - p;
-                if (n > 1) {
-                    p2 = calloc(n, 1);
-                    strncpy(p2, p + 1, n - 1);
-                    if (stricmp(p2, tagname) == 0) {
-                        void **pp = realloc(node_collection.items, (node_collection.length + 1) * pointer_length);
-                        assert(pp != NULL);
-                        node_collection.items = pp;
-                        node_collection.items[node_collection.length] = child;
-                        node_collection.length++;
-                    }
-                    free(p2);
+                p = (char*)child->v.element.original_tag.data + 1;
+                tag = strpbrk(p, " \x09\x0A\x0C\x0D/>");
+                n = tag - p;
+            }
+            //else //GumboError occutred!
+            if (n > 0) {
+                tag = calloc(n + 1, 1);
+                strncpy(tag, p, n);
+                if (stricmp(tag, tagname) == 0) {
+                    void **pp = realloc(node_collection.items, (node_collection.length + 1) * pointer_length);
+                    assert(pp != NULL);
+                    node_collection.items = pp;
+                    node_collection.items[node_collection.length] = child;
+                    node_collection.length++;
                 }
+                free(tag);
             }
             if ( sub_node_collection = getElementsByTagName(child, tagname), sub_node_collection.length > 0 ) {
                 void **pp = realloc(node_collection.items, (node_collection.length + sub_node_collection.length) * pointer_length);
@@ -219,9 +199,9 @@ NodeCollection getElementsByTagName(const GumboNode* node, const char* tagname) 
     return node_collection;
 }
 
-NodeCollection getChildren(const GumboNode* node) {
-    NodeCollection children;
-    node_collection_init(&children);
+Vector getChildren(const GumboNode* node) {
+    Vector children;
+    Vector_init(&children);
     switch (node->type) {
     case GUMBO_NODE_DOCUMENT:
         children.items = node->v.document.children.data;
@@ -237,11 +217,11 @@ NodeCollection getChildren(const GumboNode* node) {
     return children;
 }
 
-GumboNode* getNodeCollectionItem(NodeCollection *NC, size_t i) {
+GumboNode* getVectorItem(Vector *NC, size_t i) {
     return NC->items[i];
 }
 
-//
+/**/
 void PrintStr(const char *s) {
     if (s == NULL) {return;}
     printf("%s\n", s);
@@ -249,7 +229,7 @@ void PrintStr(const char *s) {
 
 void PrintGumboNode(const GumboNode* node) {
     char* str;
-    size_t n;
+    size_t n = 0;
     str = "";
     if (node == NULL) { return; }
     switch (node->type) {
@@ -257,19 +237,21 @@ void PrintGumboNode(const GumboNode* node) {
         return;
         break;
     case GUMBO_NODE_ELEMENT:
-        n = node->v.element.end_pos.offset
-            - node->v.element.start_pos.offset
-            + node->v.element.original_end_tag.length;
-        //
-        DBG("%d, %d\n", n, node->v.element.original_tag.data);
-        //
+        DBG("original_tag.length: %d\n", node->v.element.original_tag.length);
+        if (node->v.element.end_pos.offset != node->v.element.start_pos.offset) { //???
+            n = node->v.element.end_pos.offset
+                - node->v.element.start_pos.offset
+                + node->v.element.original_end_tag.length;
+        }
+        else {
+            DBG("end_pos.offset: %d\n", node->v.element.end_pos.offset);
+            n = node->v.element.original_tag.length;
+        }
         if (n > 0) {
             str = calloc(n + 1, 1);
-            //memcpy(str, node->v.element.original_tag.data, n);
-            /* documentElement */
             memcpy(str, document_str + node->v.element.start_pos.offset, n);
         }
-        else { return; }
+        else { return; } //GumboError occurred!
         break;
     case GUMBO_NODE_TEXT:
         str = (char*)node->v.text.text;
@@ -291,18 +273,20 @@ void PrintGumboNode(const GumboNode* node) {
     PrintStr(str);
 }
 
-void PrintGumboNodes(const NodeCollection *nodes) {
-    int i;
+void PrintGumboNodes(const Vector *nodes) {
+    int i, n;
     if (nodes == NULL) {return;}
-    for (i = 0; i < nodes->length; i++) {
+    n = nodes->length;
+    for (i = 0; i < n; i++) {
         PrintGumboNode(nodes->items[i]);
     }
 }
 
-//
+/**/
 void help(const char *app) {
     printf("Get information from html. v0.2.0 by YX Hao\n");
     printf("Usage: %s <operations> [html-file]\n", app);
+    printf("Encoding caution: UTF8 desired! Or strange things could happen.\n");
     printf("operation examples:\n");
     printf("    getElementById(main).getElementsByClassName(list)[0].getAttribute(href)\n");
     printf("    getElementById(main).getElementsByClassName(list)[0].getContent\n");
@@ -315,12 +299,13 @@ void help(const char *app) {
     printf("examples:\n");
     printf("    type test.htm | %s document\n", app);
     printf("    %s document < test.htm\n", app);
-    printf("    type ss.htm |%s getElementById(free).getElementsByClassName(col-sm-4).each(getElementsByTagName(h4)) |%s getElementsByTagName(h4).each(getContent) >st.txt\n", app, app);
+    printf("    type ss.htm |%s getElementsByClassName(col-sm-4) |%s getElementsByTagName(h4).each(getContent)\n", app, app);
+    printf("Tips: You may use this together with iconv.\n");
     exit(EXIT_FAILURE);
 }
 
-void parse_options_on_ws(NodeCollection NODES, GumboNode* NODE, const char* ops) {
-    Array operations, opr;
+void parse_operations_on_ws(Vector NODES, GumboNode* NODE, const char* ops) {
+    Vector operations, opr;
     char *param;
     size_t i, n;
     //
@@ -369,13 +354,13 @@ void parse_options_on_ws(NodeCollection NODES, GumboNode* NODE, const char* ops)
 EACH:
             if (strcmp(pp, "each") == 0 && NODES.length) {
                 size_t j, l;
-                NodeCollection NODES2;
-                node_collection_init(&NODES2);
+                Vector NODES2;
+                Vector_init(&NODES2);
                 l = NODES.length;
                 for (j = 0; j < l; j++) {
-                    parse_options_on_ws(NODES2, NODES.items[j], operations.items[i] + 5);
+                    parse_operations_on_ws(NODES2, NODES.items[j], operations.items[i] + 5);
                 }
-                node_collection_free(&NODES);
+                Vector_free(&NODES);
             }
             else { goto UNKNOWN; }
             break;
@@ -383,24 +368,24 @@ EACH:
             if (isdigit(*pp)) {
                 ii = atoi(pp);
                 if (NODES.length > 0) {
-                    NODE = getNodeCollectionItem(&NODES, ii);
-                    node_collection_free(&NODES);
+                    NODE = getVectorItem(&NODES, ii);
+                    Vector_free(&NODES);
                     if (i == n -1) { PrintGumboNode(NODE); }
                 }
                 else { goto UNKNOWN; }
             }
             else if (strcmp(pp, "getContent") == 0 && NODE) {
                 PrintStr(getContent(NODE));
-                node_collection_free(&NODES);
+                Vector_free(&NODES);
             }
             else if (strcmp(pp, "length") == 0 && NODES.length) {
                 printf("%d\n", NODES.length);
-                node_collection_free(&NODES);
+                Vector_free(&NODES);
             }
             else if (strcmp(pp, "document") == 0 && NODE == document) {
                 if (i == 0 && i == n - 1) {
                     PrintStr(document_str); //MUST
-                    node_collection_free(&NODES);
+                    Vector_free(&NODES);
                 }
             }
             else if (strcmp(pp, "children") == 0 && NODE) {
@@ -419,14 +404,14 @@ UNKNOWN:
     }
 }
 
-//
+/**/
 int main(int argc, const char** argv) {
     const char* filename;
     FILE* fp;
-    char* input;
-    size_t input_length;
+    char *input;
+    size_t input_length, HTML_length;
     GumboOutput* output;
-    NodeCollection NODES;
+    Vector NODES;
     GumboNode* NODE;
     //
     if (argc == 2) { fp = stdin; }
@@ -439,22 +424,36 @@ int main(int argc, const char** argv) {
             exit(EXIT_FAILURE);
         }
     }
-    else { help(argv[0]); }
+    else {
+        help(argv[0]);
+        return 87; //ERROR_INVALID_PARAMETER
+    }
     //
     input_length = read_file(fp, &input);
     if (fp != stdin) { fclose(fp); }
     //
-    if (input_length == 0) {return 0;}
-    //
-    output = gumbo_parse_with_options(&kGumboDefaultOptions, input, input_length);
-    //
     document_str = input;
+    HTML_length = input_length;
+    if (strncmp(input, "\xEF\xBB\xBF", 3) == 0) {
+        DBG("BOM\n");
+        document_str += 3;
+        HTML_length -= 3;
+    }
+    //
+    if (HTML_length == 0) {return 0;}
+    //
+    output = gumbo_parse(document_str);
+    //
+    DBG("Errors: %d\n", output->errors.length);
+    //
     document = output->document;
     NODE = document;
-    node_collection_init(&NODES);
+    Vector_init(&NODES);
     //
-    parse_options_on_ws(NODES, NODE, argv[1]);
+    parse_operations_on_ws(NODES, NODE, argv[1]);
     //
     gumbo_destroy_output(&kGumboDefaultOptions, output);
     free(input);
+    //
+    return 0;
 }
