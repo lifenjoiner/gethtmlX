@@ -22,6 +22,7 @@ void get_node_children(const GumboNode* node, GumboVector *children) {
         *children = node->v.document.children;
         break;
     case GUMBO_NODE_ELEMENT:
+    // case GUMBO_NODE_TEMPLATE: has no child!
         *children = node->v.element.children;
         break;
     default:
@@ -52,6 +53,7 @@ char* getContent(const GumboNode* node) {
     case GUMBO_NODE_DOCUMENT:
         children = &node->v.document.children;
     case GUMBO_NODE_ELEMENT:
+    // case GUMBO_NODE_TEMPLATE: has no child!
         children = &node->v.element.children;
         length = children->length;
         for (i = 0; i < length; i++) {
@@ -87,7 +89,7 @@ GumboNode* getElementById(const GumboNode* node, const char* id) {
     length = children.length;
     for (i = 0; i < length; i++) {
         GumboNode* child = children.data[i];
-        if ( child->type == GUMBO_NODE_ELEMENT ) {
+        if ( child->type == GUMBO_NODE_ELEMENT || child->type == GUMBO_NODE_TEMPLATE ) {
             if ( (ID = gumbo_get_attribute(&child->v.element.attributes, "id"))
                 && strcmp(ID->value, id) == 0 ) {
                 targetNode = child;
@@ -118,7 +120,7 @@ Vector getElementsByClassName(const GumboNode* node, const char* classname) {
     length = children.length;
     for (i = 0; i < length; i++) {
         GumboNode* child = children.data[i];
-        if ( child->type == GUMBO_NODE_ELEMENT ) {
+        if ( child->type == GUMBO_NODE_ELEMENT || child->type == GUMBO_NODE_TEMPLATE ) {
             if ((CLASS = gumbo_get_attribute(&child->v.element.attributes, "class"))
             && *CLASS->value ) { /* speed up */
                 Vector classname_s, classname_v;
@@ -158,7 +160,7 @@ Vector getElementsByTagName(const GumboNode* node, const char* tagname) {
     length = children.length;
     for (i = 0; i < length; i++) {
         GumboNode* child = children.data[i];
-        if ( child->type == GUMBO_NODE_ELEMENT ) {
+        if ( child->type == GUMBO_NODE_ELEMENT || child->type == GUMBO_NODE_TEMPLATE ) {
             char *p, *tag;
             int n = 0;
             /* html returns more
@@ -208,6 +210,7 @@ Vector getChildren(const GumboNode* node) {
         children.length = node->v.document.children.length;
         break;
     case GUMBO_NODE_ELEMENT:
+    // case GUMBO_NODE_TEMPLATE: has no child!
         children.items = node->v.element.children.data;
         children.length = node->v.element.children.length;
         break;
@@ -237,6 +240,7 @@ void PrintGumboNode(const GumboNode* node) {
         return;
         break;
     case GUMBO_NODE_ELEMENT:
+    case GUMBO_NODE_TEMPLATE:
         DBG("original_tag.length: %d\n", node->v.element.original_tag.length);
         if (node->v.element.end_pos.offset > node->v.element.start_pos.offset) { //???
             n = node->v.element.end_pos.offset
