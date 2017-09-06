@@ -42,7 +42,7 @@ char* getAttribute(const GumboNode* node, const char* attri) {
     return NULL;
 }
 
-char* getContent(const GumboNode* node) {
+char* textContent(const GumboNode* node) {
     char *ct, *ct_i;
     size_t length, i;
     const GumboVector* children;
@@ -57,7 +57,7 @@ char* getContent(const GumboNode* node) {
         children = &node->v.element.children;
         length = children->length;
         for (i = 0; i < length; i++) {
-            ct_i = getContent( children->data[i] );
+            ct_i = textContent( children->data[i] );
             //
             DBG("%s\n", ct_i);
             //
@@ -286,25 +286,25 @@ void PrintGumboNodes(const Vector *nodes) {
     }
 }
 
-/**/
+/* https://dom.spec.whatwg.org/#interface-document */
 void help(const char *app) {
-    printf("Get information from html. v0.2.0 by YX Hao\n");
-    printf("Usage: %s <operations> [html-file]\n", app);
-    printf("Encoding caution: UTF8 desired! Or strange things could happen.\n");
-    printf("operation examples:\n");
-    printf("    getElementById(main).getElementsByClassName(list)[0].getAttribute(href)\n");
-    printf("    getElementById(main).getElementsByClassName(list)[0].getContent\n");
-    printf("    getElementById(main).getElementsByClassName(\"a b\").length\n");
-    printf("    getElementById(main).getElementsByTagName(a)\n");
-    printf("    getElementById(main).children.length\n");
-    printf("    getElementsByTagName(a).each(getAttribute(href))\n");
-    printf("    document\n");
-    printf("    [document.]children\n");
-    printf("examples:\n");
-    printf("    type test.htm | %s document\n", app);
-    printf("    %s document < test.htm\n", app);
-    printf("    type ss.htm |%s getElementsByClassName(col-sm-4) |%s getElementsByTagName(h4).each(getContent)\n", app, app);
-    printf("Tips: You may use this together with iconv.\n");
+    fprintf(stderr, "Get information from html. v0.2.2 by YX Hao\n");
+    fprintf(stderr, "Usage: %s <operations> [html-file]\n", app);
+    fprintf(stderr, "Encoding caution: UTF8 desired! Or strange things could happen.\n");
+    fprintf(stderr, "operation examples:\n");
+    fprintf(stderr, "    getElementById(main).getElementsByClassName(list)[0].getAttribute(href)\n");
+    fprintf(stderr, "    getElementById(main).getElementsByClassName(list)[0].textContent\n");
+    fprintf(stderr, "    getElementById(main).getElementsByClassName(\"a b\").length\n");
+    fprintf(stderr, "    getElementById(main).getElementsByTagName(a)\n");
+    fprintf(stderr, "    getElementById(main).children.length\n");
+    fprintf(stderr, "    getElementsByTagName(a).each(getAttribute(href))\n");
+    fprintf(stderr, "    document\n");
+    fprintf(stderr, "    [document.]children\n");
+    fprintf(stderr, "examples:\n");
+    fprintf(stderr, "    type test.htm | %s document\n", app);
+    fprintf(stderr, "    %s document < test.htm\n", app);
+    fprintf(stderr, "    type ss.htm |%s getElementsByClassName(col-sm-4) |%s getElementsByTagName(h4).each(textContent)\n", app, app);
+    fprintf(stderr, "Tips: You may use this together with iconv.\n");
     exit(EXIT_FAILURE);
 }
 
@@ -378,8 +378,8 @@ EACH:
                 }
                 else { goto UNKNOWN; }
             }
-            else if (strcmp(pp, "getContent") == 0 && NODE) {
-                PrintStr(getContent(NODE));
+            else if (strcmp(pp, "textContent") == 0 && NODE) {
+                PrintStr(textContent(NODE));
                 Vector_free(&NODES);
             }
             else if (strcmp(pp, "length") == 0 && NODES.length) {
@@ -401,7 +401,7 @@ EACH:
             break;
         default:
 UNKNOWN:
-            printf("Err: %s\n", operations.items[i]);
+            fprintf(stderr, "Err: %s\n", operations.items[i]);
             i = n;
             break;
         }
@@ -424,7 +424,7 @@ int main(int argc, const char** argv) {
         filename = argv[2];
         fp = fopen(filename, "r");
         if (!fp) {
-            printf("File not found: %s\n", filename);
+            fprintf(stderr, "File not found: %s\n", filename);
             exit(EXIT_FAILURE);
         }
     }
