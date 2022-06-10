@@ -133,6 +133,8 @@ Vector getElementsByClassName(const GumboNode* node, const char* classname) {
                     node_collection.items[node_collection.length] = child;
                     node_collection.length++;
                 }
+                Vector_free_ex(&classname_v);
+                Vector_free_ex(&classname_s);
             }
             if ( sub_node_collection = getElementsByClassName(child, classname), sub_node_collection.length > 0 ) {
                 void **pp = realloc(node_collection.items, (node_collection.length + sub_node_collection.length) * pointer_length);
@@ -364,6 +366,7 @@ EACH:
                 for (j = 0; j < l; j++) {
                     parse_operations_on_ws(NODES2, NODES.items[j], operations.items[i] + 5);
                 }
+                Vector_free(&NODES2);
                 Vector_free(&NODES);
             }
             else { goto UNKNOWN; }
@@ -405,7 +408,9 @@ UNKNOWN:
             i = n;
             break;
         }
+        Vector_free_ex(&opr);
     }
+    Vector_free_ex(&operations);
 }
 
 /**/
