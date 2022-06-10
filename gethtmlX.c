@@ -233,9 +233,8 @@ void PrintStr(const char *s) {
 }
 
 void PrintGumboNode(const GumboNode* node) {
-    char* str;
+    char* str = "", *p;
     size_t n = 0;
-    str = "";
     if (node == NULL) { return; }
     switch (node->type) {
     case GUMBO_NODE_DOCUMENT:
@@ -253,30 +252,28 @@ void PrintGumboNode(const GumboNode* node) {
             DBG("end_pos.offset: %d\n", node->v.element.end_pos.offset);
             n = node->v.element.original_tag.length;
         }
-        if (n > 0) {
-            str = calloc(n + 1, 1);
-            memcpy(str, document_str + node->v.element.start_pos.offset, n);
-        }
-        else { return; } //GumboError occurred!
+        p = document_str + node->v.element.start_pos.offset;
         break;
     case GUMBO_NODE_TEXT:
-        str = (char*)node->v.text.text;
+        p = (char *)node->v.text.text;
+        n = strlen(p);
         break;
     default:
         DBG("%d\n", node->v.text.original_text.length);
         //
         n = node->v.text.original_text.length;
-        if (n > 0) {
-            str = calloc(n + 1, 1);
-            memcpy(str, node->v.text.original_text.data, n);
-        }
-        else { return; }
+        p = (char *)node->v.text.original_text.data;
         break;
     }
     //
     DBG("Node Type: %d\n", node->type);
     //
-    PrintStr(str);
+    if (n > 0) {
+        str = calloc(n + 1, 1);
+        memcpy(str, p, n);
+        PrintStr(str);
+        free(str);
+    }
 }
 
 void PrintGumboNodes(const Vector *nodes) {
@@ -303,14 +300,15 @@ void help(const char *app) {
     fprintf(stderr, "    document\n");
     fprintf(stderr, "    [document.]children\n");
     fprintf(stderr, "examples:\n");
-    fprintf(stderr, "    type test.htm | %s document\n", app);
-    fprintf(stderr, "    %s document < test.htm\n", app);
-    fprintf(stderr, "    type ss.htm |%s getElementsByClassName(col-sm-4) |%s getElementsByTagName(h4).each(textContent)\n", app, app);
+    fprintf(stderr, "    type test.htm | %s getElementsByTagName(a)\n", app);
+    fprintf(stderr, "    %s getElementsByTagName(a) < test.htm\n", app);
+    fprintf(stderr, "    type ss.htm | %s getElementsByClassName(col-sm-4) | %s getElementsByTagName(h4).each(textContent)\n", app, app);
     fprintf(stderr, "Tips: You may use this together with iconv.\n");
     exit(EXIT_FAILURE);
 }
 
-void parse_operations_on_ws(Vector NODES, GumboNode* NODE, const char* ops) {
+void parse_operations_on_ws(GumboNode* NODE, const char* ops) {
+    Vector NODES;
     Vector operations, opr;
     char *param;
     size_t i, n;
@@ -320,7 +318,7 @@ void parse_operations_on_ws(Vector NODES, GumboNode* NODE, const char* ops) {
     //
     DBG("%d\n", n);
     //
-    i = n;
+    Vector_init(&NODES);
     for (i = 0; i < n; i++) {
         char *pp;
         int ii, nn;
@@ -340,17 +338,14 @@ void parse_operations_on_ws(Vector NODES, GumboNode* NODE, const char* ops) {
             param = opr.items[1];
             if (strcmp(pp, "getElementById") == 0 && NODE == document) {
                 NODE = getElementById(NODE, param);
-                if (i == n -1) { PrintGumboNode(NODE); }
             }
             else if (strcmp(pp, "getElementsByClassName") == 0 && NODE) {
                 NODES = getElementsByClassName(NODE, param);
                 NODE = NULL;
-                if (i == n -1) { PrintGumboNodes(&NODES); }
             }
             else if (strcmp(pp, "getElementsByTagName") == 0 && NODE) {
                 NODES = getElementsByTagName(NODE, param);
                 NODE = NULL;
-                if (i == n -1) { PrintGumboNodes(&NODES); }
             }
             else if (strcmp(pp, "getAttribute") == 0 && NODE) {
                 PrintStr(getAttribute(NODE, param));
@@ -360,13 +355,10 @@ void parse_operations_on_ws(Vector NODES, GumboNode* NODE, const char* ops) {
 EACH:
             if (strcmp(pp, "each") == 0 && NODES.length) {
                 size_t j, l;
-                Vector NODES2;
-                Vector_init(&NODES2);
                 l = NODES.length;
                 for (j = 0; j < l; j++) {
-                    parse_operations_on_ws(NODES2, NODES.items[j], operations.items[i] + 5);
+                    parse_operations_on_ws(NODES.items[j], operations.items[i] + 5);
                 }
-                Vector_free(&NODES2);
                 Vector_free(&NODES);
             }
             else { goto UNKNOWN; }
@@ -377,39 +369,38 @@ EACH:
                 if (NODES.length > 0) {
                     NODE = getVectorItem(&NODES, ii);
                     Vector_free(&NODES);
-                    if (i == n -1) { PrintGumboNode(NODE); }
                 }
                 else { goto UNKNOWN; }
             }
             else if (strcmp(pp, "textContent") == 0 && NODE) {
                 PrintStr(textContent(NODE));
-                Vector_free(&NODES);
+                NODE = NULL;
             }
             else if (strcmp(pp, "length") == 0 && NODES.length) {
                 printf("%d\n", NODES.length);
                 Vector_free(&NODES);
             }
-            else if (strcmp(pp, "document") == 0 && NODE == document) {
-                if (i == 0 && i == n - 1) {
-                    PrintStr(document_str); //MUST
-                    Vector_free(&NODES);
-                }
+            else if (strcmp(pp, "document") == 0 && i == 0) {
+                // valid, but don't output.
             }
             else if (strcmp(pp, "children") == 0 && NODE) {
                 NODES = getChildren(NODE);
                 NODE = NULL;
-                if (i == n -1) { PrintGumboNodes(&NODES); }
             }
             else { goto UNKNOWN; }
             break;
         default:
 UNKNOWN:
+            Vector_free(&NODES);
+            NODE = NULL;
             fprintf(stderr, "Err: %s\n", operations.items[i]);
             i = n;
             break;
         }
         Vector_free_ex(&opr);
     }
+    PrintGumboNode(NODE);
+    PrintGumboNodes(&NODES);
     Vector_free_ex(&operations);
 }
 
@@ -420,7 +411,6 @@ int main(int argc, const char** argv) {
     char *input;
     size_t input_length, HTML_length;
     GumboOutput* output;
-    Vector NODES;
     GumboNode* NODE;
     //
     if (argc == 2) { fp = stdin; }
@@ -457,9 +447,8 @@ int main(int argc, const char** argv) {
     //
     document = output->document;
     NODE = document;
-    Vector_init(&NODES);
     //
-    parse_operations_on_ws(NODES, NODE, argv[1]);
+    parse_operations_on_ws(NODE, argv[1]);
     //
     gumbo_destroy_output(&kGumboDefaultOptions, output);
     free(input);

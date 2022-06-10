@@ -12,8 +12,8 @@ operation examples:
     document
     [document.]children
 examples:
-    type test.htm | gethtmlx document
-    gethtmlx document < test.htm
+    type test.htm | gethtmlx getElementsByTagName(a)
+    gethtmlx getElementsByTagName(a) < test.htm
     type ss.htm |gethtmlx getElementsByClassName(col-sm-4) |gethtmlx getElementsByTagName(h4).each(textContent)
 Tips: You may use this together with iconv.
 
