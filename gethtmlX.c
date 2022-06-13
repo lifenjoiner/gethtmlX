@@ -287,7 +287,7 @@ void PrintGumboNodes(const Vector *nodes) {
 
 /* https://dom.spec.whatwg.org/#interface-document */
 void help(const char *app) {
-    fprintf(stderr, "Get information from html. v0.2.3 by YX Hao\n");
+    fprintf(stderr, "Get information from html. v0.2.4 by YX Hao\n");
     fprintf(stderr, "Usage: %s <operations> [html-file]\n", app);
     fprintf(stderr, "Encoding caution: UTF8 desired! Or strange things could happen.\n");
     fprintf(stderr, "operation examples:\n");
