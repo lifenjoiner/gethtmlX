@@ -17,8 +17,7 @@ void Vector_init(Vector* vector) {
 
 void Vector_free(Vector* vector) {
     free(vector->items);
-    vector->length = 0;
-    vector->capacity = 0;
+    Vector_init(vector);
 }
 
 void Vector_free_ex(Vector *vector) {
@@ -39,13 +38,12 @@ Vector str_split(const char* str, const char* delims) {
     Str.length = 0;
     Str.items = NULL;
     //
-    for (p = str_t; p = strtok(p, delims); p != NULL) {
+    for (p = str_t; p = strtok(p, delims), p != NULL; p = NULL) {
         pp = realloc(Str.items, sizeof(char*) * (Str.length+1));
         //assert(pp != NULL);
         Str.items = pp;
         Str.items[Str.length] = strdup(p);
         Str.length++;
-        p = NULL;
     }
     free(str_t);
     return Str;
